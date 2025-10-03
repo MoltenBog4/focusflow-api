@@ -1,13 +1,14 @@
 {
   "name": "focusflow-api",
   "version": "1.0.0",
-  "description": "",
+  "description": "FocusFlow API with Node.js, Express, and MongoDB",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["tasks", "focusflow", "api"],
+  "author": "Your Name",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
