@@ -6,8 +6,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB Atlas (replace with your real connection string)
-mongoose.connect("mongodb+srv://Sashiel:Marquez18@focusflow.385yfyu.mongodb.net/?retryWrites=true&w=majority&appName=FocusFlow", {
+// ✅ Use environment variable
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
