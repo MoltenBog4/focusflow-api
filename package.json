@@ -7,12 +7,17 @@
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["tasks", "focusflow", "api"],
+  "keywords": [
+    "tasks",
+    "focusflow",
+    "api"
+  ],
   "author": "Your Name",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "firebase-admin": "^13.5.0",
     "mongoose": "^8.19.0"
   }
 }
