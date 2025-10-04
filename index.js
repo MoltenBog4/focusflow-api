@@ -7,109 +7,89 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Decode Firebase service account from environment variable
+// ---- Firebase Admin from env (Render) ----
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-  console.error("❌ FIREBASE_SERVICE_ACCOUNT environment variable not set!");
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT is not set");
   process.exit(1);
 }
-
 const serviceAccount = JSON.parse(
   Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8")
 );
+admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 
-// ✅ Initialize Firebase Admin
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-// ✅ Connect to MongoDB
+// ---- MongoDB ----
 mongoose
-  .connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("✅ Connected to MongoDB Atlas"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// ✅ Middleware to verify Firebase ID token
+// ---- Auth middleware ----
 async function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing or invalid token" });
-  }
-
-  const idToken = authHeader.split("Bearer ")[1];
-
+  const h = req.headers.authorization;
+  if (!h || !h.startsWith("Bearer ")) return res.status(401).json({ error: "Missing token" });
+  const token = h.split("Bearer ")[1];
   try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    req.user = decodedToken; // uid, email, etc.
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.user = decoded; // has uid
     next();
-  } catch (err) {
-    console.error("Token verification failed:", err);
+  } catch (e) {
+    console.error("Token verification failed:", e);
     res.status(401).json({ error: "Unauthorized" });
   }
 }
 
-// ✅ Root endpoint
-app.get("/", (req, res) => {
-  res.send("✅ FocusFlow API is running! Use /tasks to interact with tasks.");
-});
+// ---- Root ----
+app.get("/", (_req, res) => res.send("✅ FocusFlow API running"));
 
-// ✅ Task Schema
+// ---- Task schema (user-specific + calendar fields) ----
 const taskSchema = new mongoose.Schema({
+  userId: { type: String, required: true },   // 🔐 Firebase UID owner
   title: String,
   priority: String,
   completed: Boolean,
-  userId: { type: String, required: true }, // Firebase UID
-});
 
+  allDay: Boolean,
+  startTime: Number,         // epoch millis
+  endTime: Number,
+  location: String,
+  reminderOffsetMinutes: Number
+});
 const Task = mongoose.model("Task", taskSchema);
 
-// ✅ All routes below this line require authentication
+// ---- Protected routes ----
 app.use(verifyToken);
 
-// 📥 Get all tasks for authenticated user
+// list user tasks
 app.get("/tasks", async (req, res) => {
-  const tasks = await Task.find({ userId: req.user.uid });
+  const tasks = await Task.find({ userId: req.user.uid }).sort({ startTime: 1, _id: -1 });
   res.json(tasks);
 });
 
-// ➕ Create task for authenticated user
+// create user task
 app.post("/tasks", async (req, res) => {
-  const task = new Task({
-    ...req.body,
-    userId: req.user.uid,
-  });
+  const task = new Task({ ...req.body, userId: req.user.uid });
   await task.save();
   res.status(201).json(task);
 });
 
-// 🖊️ Update task (only if owned by user)
+// update user task
 app.put("/tasks/:id", async (req, res) => {
   const updated = await Task.findOneAndUpdate(
     { _id: req.params.id, userId: req.user.uid },
     req.body,
     { new: true }
   );
-  if (!updated) {
-    return res.status(404).json({ error: "Task not found or not authorized" });
-  }
+  if (!updated) return res.status(404).json({ error: "Task not found or not authorized" });
   res.json(updated);
 });
 
-// 🗑️ Delete task (only if owned by user)
+// delete user task
 app.delete("/tasks/:id", async (req, res) => {
-  const deleted = await Task.findOneAndDelete({
-    _id: req.params.id,
-    userId: req.user.uid,
-  });
-  if (!deleted) {
-    return res.status(404).json({ error: "Task not found or not authorized" });
-  }
+  const deleted = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.uid });
+  if (!deleted) return res.status(404).json({ error: "Task not found or not authorized" });
   res.json({ message: "Task deleted" });
 });
 
-// ✅ Start server
+// ---- Start ----
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 API on :${PORT}`));
