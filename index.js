@@ -2,15 +2,22 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const admin = require("firebase-admin");
-const path = require("path");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Load Firebase service account
-const serviceAccount = require(path.join(__dirname, "serviceAccountKey.json"));
+// ✅ Decode Firebase service account from environment variable
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT environment variable not set!");
+  process.exit(1);
+}
 
+const serviceAccount = JSON.parse(
+  Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8")
+);
+
+// ✅ Initialize Firebase Admin
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
@@ -93,7 +100,10 @@ app.put("/tasks/:id", async (req, res) => {
 
 // 🗑️ Delete task (only if owned by user)
 app.delete("/tasks/:id", async (req, res) => {
-  const deleted = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.uid });
+  const deleted = await Task.findOneAndDelete({
+    _id: req.params.id,
+    userId: req.user.uid,
+  });
   if (!deleted) {
     return res.status(404).json({ error: "Task not found or not authorized" });
   }
