@@ -1,24 +1,28 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const admin = require("firebase-admin"); // ✅ Firebase Admin
+const admin = require("firebase-admin");
+const path = require("path");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Initialise Firebase Admin SDK
-// Make sure you have your Firebase service account JSON set in an environment variable or file
-// Example: process.env.GOOGLE_APPLICATION_CREDENTIALS = "./serviceAccountKey.json"
-admin.initializeApp();
+// ✅ Load Firebase service account
+const serviceAccount = require(path.join(__dirname, "serviceAccountKey.json"));
 
-// ✅ Connect to MongoDB (from Render Environment Variables)
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log("✅ Connected to MongoDB Atlas"))
-.catch(err => console.error("❌ MongoDB connection error:", err));
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+// ✅ Connect to MongoDB
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("✅ Connected to MongoDB Atlas"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 // ✅ Middleware to verify Firebase ID token
 async function verifyToken(req, res, next) {
@@ -32,7 +36,7 @@ async function verifyToken(req, res, next) {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
-    req.user = decodedToken; // contains uid, email, etc.
+    req.user = decodedToken; // uid, email, etc.
     next();
   } catch (err) {
     console.error("Token verification failed:", err);
@@ -45,48 +49,54 @@ app.get("/", (req, res) => {
   res.send("✅ FocusFlow API is running! Use /tasks to interact with tasks.");
 });
 
-// ✅ Task schema (with userId)
+// ✅ Task Schema
 const taskSchema = new mongoose.Schema({
   title: String,
   priority: String,
   completed: Boolean,
-  userId: { type: String, required: true }, // 🔐 Firebase UID
+  userId: { type: String, required: true }, // Firebase UID
 });
 
 const Task = mongoose.model("Task", taskSchema);
 
-// ✅ CRUD Routes (protected)
-app.use(verifyToken); // All routes below this line require auth
+// ✅ All routes below this line require authentication
+app.use(verifyToken);
 
-// Get all tasks for logged-in user
+// 📥 Get all tasks for authenticated user
 app.get("/tasks", async (req, res) => {
   const tasks = await Task.find({ userId: req.user.uid });
   res.json(tasks);
 });
 
-// Create task for logged-in user
+// ➕ Create task for authenticated user
 app.post("/tasks", async (req, res) => {
   const task = new Task({
     ...req.body,
-    userId: req.user.uid, // attach Firebase UID
+    userId: req.user.uid,
   });
   await task.save();
   res.status(201).json(task);
 });
 
-// Update task (only if belongs to user)
+// 🖊️ Update task (only if owned by user)
 app.put("/tasks/:id", async (req, res) => {
   const updated = await Task.findOneAndUpdate(
-    { _id: req.params.id, userId: req.user.uid }, // 🔐 ensure ownership
+    { _id: req.params.id, userId: req.user.uid },
     req.body,
     { new: true }
   );
+  if (!updated) {
+    return res.status(404).json({ error: "Task not found or not authorized" });
+  }
   res.json(updated);
 });
 
-// Delete task (only if belongs to user)
+// 🗑️ Delete task (only if owned by user)
 app.delete("/tasks/:id", async (req, res) => {
-  await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.uid });
+  const deleted = await Task.findOneAndDelete({ _id: req.params.id, userId: req.user.uid });
+  if (!deleted) {
+    return res.status(404).json({ error: "Task not found or not authorized" });
+  }
   res.json({ message: "Task deleted" });
 });
 
