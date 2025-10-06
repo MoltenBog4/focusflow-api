@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ---- Firebase Admin from env (Render) ----
+// ---- Firebase Admin ----
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   console.error("❌ FIREBASE_SERVICE_ACCOUNT is not set");
   process.exit(1);
@@ -38,15 +38,12 @@ async function verifyToken(req, res, next) {
   }
 }
 
-// ---- Root ----
-app.get("/", (_req, res) => res.send("✅ FocusFlow API running"));
-
-// ---- Task schema (user-specific + calendar fields + fcm token) ----
+// ---- Task schema (plus fcmToken) ----
 const taskSchema = new mongoose.Schema({
-  userId: { type: String, required: true },   // 🔐 Firebase UID owner
+  userId: { type: String, required: true },
   title: String,
   priority: String,
-  completed: Boolean,
+  completed: { type: Boolean, default: false },
 
   allDay: Boolean,
   startTime: Number,
@@ -54,7 +51,7 @@ const taskSchema = new mongoose.Schema({
   location: String,
   reminderOffsetMinutes: Number,
 
-  fcmToken: String // <-- added field
+  fcmToken: String
 });
 const Task = mongoose.model("Task", taskSchema);
 
@@ -70,11 +67,10 @@ app.get("/tasks", async (req, res) => {
 // create user task
 app.post("/tasks", async (req, res) => {
   const body = req.body;
-  // ensure fcmToken comes from client
-  const task = new Task({ ...body, userId: req.user.uid });
+  const task = new Task({ ...body, userId: req.user.uid, completed: false });
   await task.save();
 
-  // Schedule FCM notification
+  // Schedule individual reminder
   if (
     task.fcmToken &&
     typeof task.startTime === "number" &&
@@ -109,7 +105,7 @@ app.post("/tasks", async (req, res) => {
   res.status(201).json(task);
 });
 
-// update user task
+// update user task (e.g. mark as completed)
 app.put("/tasks/:id", async (req, res) => {
   const updated = await Task.findOneAndUpdate(
     { _id: req.params.id, userId: req.user.uid },
@@ -127,6 +123,69 @@ app.delete("/tasks/:id", async (req, res) => {
   res.json({ message: "Task deleted" });
 });
 
+// ---- New: Daily summary push job ----
+async function sendDailySummary() {
+  // For each user, fetch tasks due today and not completed, then send push if any
+  const now = Date.now();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+
+  // find tasks for all users? or group by userId
+  const tasks = await Task.find({
+    startTime: { $gte: startOfDay.getTime(), $lte: endOfDay.getTime() },
+    completed: false,
+    fcmToken: { $exists: true, $ne: null }
+  });
+
+  // group by userId + fcmToken
+  const byUser = {};
+  tasks.forEach(t => {
+    const key = t.userId + "|" + t.fcmToken;
+    if (!byUser[key]) byUser[key] = [];
+    byUser[key].push(t);
+  });
+
+  for (const key in byUser) {
+    const arr = byUser[key];
+    // pick one token
+    const token = arr[0].fcmToken;
+    const titles = arr.map(t => t.title).join(", ");
+    await admin.messaging().send({
+      token,
+      notification: {
+        title: "Tasks Due Today",
+        body: `You have: ${titles}`
+      }
+    }).catch(err => console.error("Daily summary push error", err));
+  }
+}
+
+// Schedule daily summary (once per day)
+// Here simple setInterval — but better: cron, or use a scheduling library like node-cron
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+// Compute delay until next midnight + small offset
+function scheduleDailySummary() {
+  const now = new Date();
+  const next = new Date();
+  next.setHours(8, 0, 0, 0); // e.g. send at 8:00 each day
+  if (next <= now) {
+    next.setDate(next.getDate() + 1);
+  }
+  const delay = next.getTime() - now.getTime();
+  setTimeout(() => {
+    sendDailySummary();
+    // then run every 24h
+    setInterval(sendDailySummary, ONE_DAY_MS);
+  }, delay);
+}
+
+// Start daily summary job
+scheduleDailySummary();
+
 // ---- Start server ----
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 API on :${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 API on :${PORT}`);
+});
