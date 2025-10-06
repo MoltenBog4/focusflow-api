@@ -41,7 +41,7 @@ async function verifyToken(req, res, next) {
 // ---- Root ----
 app.get("/", (_req, res) => res.send("✅ FocusFlow API running"));
 
-// ---- Task schema (user-specific + calendar fields) ----
+// ---- Task schema (user-specific + calendar fields + fcm token) ----
 const taskSchema = new mongoose.Schema({
   userId: { type: String, required: true },   // 🔐 Firebase UID owner
   title: String,
@@ -49,10 +49,12 @@ const taskSchema = new mongoose.Schema({
   completed: Boolean,
 
   allDay: Boolean,
-  startTime: Number,         // epoch millis
+  startTime: Number,
   endTime: Number,
   location: String,
-  reminderOffsetMinutes: Number
+  reminderOffsetMinutes: Number,
+
+  fcmToken: String // <-- added field
 });
 const Task = mongoose.model("Task", taskSchema);
 
@@ -67,8 +69,43 @@ app.get("/tasks", async (req, res) => {
 
 // create user task
 app.post("/tasks", async (req, res) => {
-  const task = new Task({ ...req.body, userId: req.user.uid });
+  const body = req.body;
+  // ensure fcmToken comes from client
+  const task = new Task({ ...body, userId: req.user.uid });
   await task.save();
+
+  // Schedule FCM notification
+  if (
+    task.fcmToken &&
+    typeof task.startTime === "number" &&
+    typeof task.reminderOffsetMinutes === "number"
+  ) {
+    const reminderTime = task.startTime - task.reminderOffsetMinutes * 60 * 1000;
+    const delay = reminderTime - Date.now();
+
+    if (delay > 0) {
+      setTimeout(() => {
+        admin
+          .messaging()
+          .send({
+            token: task.fcmToken,
+            notification: {
+              title: "⏰ Task Reminder",
+              body: `${task.title} is due soon!`
+            }
+          })
+          .then(() => {
+            console.log(`✅ Sent reminder for task: ${task.title}`);
+          })
+          .catch((err) => {
+            console.error("⚠️ Error sending FCM", err);
+          });
+      }, delay);
+    } else {
+      console.log("⚠️ Reminder time already passed, skipping push for", task.title);
+    }
+  }
+
   res.status(201).json(task);
 });
 
@@ -90,6 +127,6 @@ app.delete("/tasks/:id", async (req, res) => {
   res.json({ message: "Task deleted" });
 });
 
-// ---- Start ----
+// ---- Start server ----
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 API on :${PORT}`));
