@@ -105,7 +105,7 @@ Data syncs between **RoomDB (local storage)** and **MongoDB (cloud)** via RESTfu
 
 ### ⚙️ **Backend API**
 
-👉 [API Repository – focusflow-api](https://github.com/MoltenBog4/focusflow-api.git)
+
 👉 [Hosted API – Render](https://focusflow-api-ts06.onrender.com)
 
 ---
