@@ -133,7 +133,6 @@ https://focusflow-api-ts06.onrender.com
 ## 🎥 **YouTube Demonstration**
 
 📺 **FocusFlowV2 – Final POE Demo Video**
-🔗 [YouTube Link – FocusFlow Demo](https://youtu.be/Jz4rFbhzQGI?si=PkdkIOF2if381a1z)
 https://youtu.be/Jz4rFbhzQGI?si=PkdkIOF2if381a1z
 ---
 
