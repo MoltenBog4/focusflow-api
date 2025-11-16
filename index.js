@@ -60,13 +60,28 @@ app.use(verifyToken);
 
 // list user tasks
 app.get("/tasks", async (req, res) => {
-  const tasks = await Task.find({ userId: req.user.uid }).sort({ startTime: 1, _id: -1 });
+  // Accept userId as query parameter, but validate it matches authenticated user
+  const userId = req.query.userId || req.user.uid;
+  
+  // Security check: prevent users from accessing other users' tasks
+  if (userId !== req.user.uid) {
+    return res.status(403).json({ error: "Forbidden: Cannot access other users' tasks" });
+  }
+  
+  const tasks = await Task.find({ userId: userId }).sort({ startTime: 1, _id: -1 });
   res.json(tasks);
 });
 
 // create user task
 app.post("/tasks", async (req, res) => {
   const body = req.body;
+  
+  // Validate that userId in body matches authenticated user (if provided)
+  if (body.userId && body.userId !== req.user.uid) {
+    return res.status(403).json({ error: "Forbidden: userId must match authenticated user" });
+  }
+  
+  // Always use authenticated user's uid to ensure security
   const task = new Task({ ...body, userId: req.user.uid, completed: false });
   await task.save();
 
@@ -107,9 +122,19 @@ app.post("/tasks", async (req, res) => {
 
 // update user task (e.g. mark as completed)
 app.put("/tasks/:id", async (req, res) => {
+  // Validate that userId in body matches authenticated user (if provided)
+  if (req.body.userId && req.body.userId !== req.user.uid) {
+    return res.status(403).json({ error: "Forbidden: userId must match authenticated user" });
+  }
+  
+  // Ensure updates only affect tasks belonging to the authenticated user
+  // Remove userId from body to prevent tampering, use authenticated user's uid
+  const updateData = { ...req.body };
+  delete updateData.userId; // Prevent userId modification
+  
   const updated = await Task.findOneAndUpdate(
     { _id: req.params.id, userId: req.user.uid },
-    req.body,
+    updateData,
     { new: true }
   );
   if (!updated) return res.status(404).json({ error: "Task not found or not authorized" });
