@@ -1,0 +1,279 @@
+{
+	"info": {
+		"name": "FocusFlow API",
+		"description": "Complete API collection for FocusFlow backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Tasks",
+			"item": [
+				{
+					"name": "Get All Tasks",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks"]
+						}
+					}
+				},
+				{
+					"name": "Create Task",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Team meeting\",\n  \"priority\": \"High\",\n  \"allDay\": false,\n  \"startTime\": 1704067200000,\n  \"endTime\": 1704070800000,\n  \"location\": \"Conference Room A\",\n  \"latitude\": 40.7128,\n  \"longitude\": -74.0060,\n  \"reminderOffsetMinutes\": 15\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks"]
+						}
+					}
+				},
+				{
+					"name": "Create Task with Location",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Visit Central Park\",\n  \"priority\": \"Medium\",\n  \"startTime\": 1704067200000,\n  \"location\": \"Central Park, NYC\",\n  \"latitude\": 40.7829,\n  \"longitude\": -73.9654,\n  \"reminderOffsetMinutes\": 30\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks"]
+						}
+					}
+				},
+				{
+					"name": "Update Task",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated task title\",\n  \"completed\": true,\n  \"latitude\": 40.7580,\n  \"longitude\": -73.9855\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tasks/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "TASK_ID_HERE",
+									"description": "Task ID to update"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Task",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "TASK_ID_HERE",
+									"description": "Task ID to delete"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "FCM Token",
+			"item": [
+				{
+					"name": "Store FCM Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fcmToken\": \"your_fcm_token_here\",\n  \"deviceId\": \"device_12345\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/fcm-token",
+							"host": ["{{baseUrl}}"],
+							"path": ["users", "fcm-token"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "Send Manual Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Test Notification\",\n  \"body\": \"This is a test notification\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tasks/:id/notify",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks", ":id", "notify"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "TASK_ID_HERE",
+									"description": "Task ID to send notification for"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Offline Sync",
+			"item": [
+				{
+					"name": "Sync Tasks",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tasks\": [\n    {\n      \"localId\": \"local_123\",\n      \"title\": \"Synced Task 1\",\n      \"priority\": \"High\",\n      \"latitude\": 40.7128,\n      \"longitude\": -74.0060\n    },\n    {\n      \"localId\": \"local_456\",\n      \"_id\": \"EXISTING_TASK_ID\",\n      \"title\": \"Updated Task\",\n      \"completed\": true\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tasks/sync",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks", "sync"]
+						}
+					}
+				},
+				{
+					"name": "Get Sync Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{firebaseToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks/sync-status",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks", "sync-status"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "firebaseToken",
+			"value": "YOUR_FIREBASE_TOKEN_HERE",
+			"type": "string"
+		}
+	]
+}
+

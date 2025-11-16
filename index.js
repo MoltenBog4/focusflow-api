@@ -27,15 +27,46 @@ mongoose
 // ---- Auth middleware ----
 async function verifyToken(req, res, next) {
   const h = req.headers.authorization;
-  if (!h || !h.startsWith("Bearer ")) return res.status(401).json({ error: "Missing token" });
-  const token = h.split("Bearer ")[1];
+  if (!h || !h.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing token", details: "Authorization header must start with 'Bearer '" });
+  }
+  
+  const token = h.split("Bearer ")[1]?.trim();
+  
+  if (!token) {
+    return res.status(401).json({ error: "Missing token", details: "Token is empty after 'Bearer '" });
+  }
+  
+  // Basic validation: Firebase ID tokens are JWTs with 3 parts separated by dots
+  if (!token.includes('.') || token.split('.').length !== 3) {
+    console.error("Invalid token format - not a JWT:", token.substring(0, 20) + "...");
+    return res.status(401).json({ 
+      error: "Invalid token format", 
+      details: "Firebase ID token must be a valid JWT (3 parts separated by dots)" 
+    });
+  }
+  
   try {
     const decoded = await admin.auth().verifyIdToken(token);
     req.user = decoded; // has uid
     next();
   } catch (e) {
-    console.error("Token verification failed:", e);
-    res.status(401).json({ error: "Unauthorized" });
+    console.error("Token verification failed:", e.message);
+    console.error("Token preview:", token.substring(0, 50) + "...");
+    
+    // Provide more helpful error messages
+    let errorMessage = "Unauthorized";
+    let errorDetails = e.message;
+    
+    if (e.code === 'auth/argument-error') {
+      errorDetails = "Invalid token format. Make sure you're sending a Firebase ID token (not FCM token). Use FirebaseAuth.getInstance().currentUser?.getIdToken(true)";
+    } else if (e.code === 'auth/id-token-expired') {
+      errorDetails = "Token has expired. Refresh the token and try again.";
+    } else if (e.code === 'auth/id-token-revoked') {
+      errorDetails = "Token has been revoked. User may have been deleted or disabled.";
+    }
+    
+    res.status(401).json({ error: errorMessage, details: errorDetails });
   }
 }
 
